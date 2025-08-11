@@ -1,0 +1,49 @@
+name: QEI Flaky JOB
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: '30 6 * * 0'  # Every Sunday at 12:00 PM IST (06:30 UTC)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set Static BrowserStack Env Vars (Before setup-env)
+        run: |
+          echo "BROWSERSTACK_USERNAME=${{ secrets.BROWSERSTACK_USERNAME }}" >> $GITHUB_ENV
+          echo "BROWSERSTACK_ACCESS_KEY=${{ secrets.BROWSERSTACK_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "BROWSERSTACK_BUILD_NAME=QEI-FLAKY-JOB-BUILD" >> $GITHUB_ENV
+          echo "BROWSERSTACK_PROJECT_NAME=TO-QEI-AUTOMATION-WEEKLY" >> $GITHUB_ENV
+          echo "BROWSERSTACK_SESSION_NAME=FLAKY-JOB-TEST" >> $GITHUB_ENV
+
+      - name: Setup BrowserStack Environment (Test Observability + Respect Static Build Name)
+        uses: browserstack/github-actions/setup-env@master
+        with:
+          username: ${{ secrets.BROWSERSTACK_USERNAME }}
+          access-key: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+          build-name: QEI-FLAKY-JOB-BUILD
+          project-name: TO-QEI-AUTOMATION-WEEKLY
+
+      - name: 🔧 Build and Test with Maven
+        run: mvn clean test "-Dsurefire.suiteXmlFiles=config/sample-flaky-test.xml"
+
+      - name: 📦 Archive TestNG Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testng-junit-report_test1
+          path: target/surefire-reports/junitreports/*.xml
